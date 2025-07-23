@@ -1,0 +1,10 @@
+[project]
+name = "etl-athena-to-es-dynamodb"
+version = "0.1.0"
+description = "ETL pipeline: Athena -> OpenSearch + DynamoDB"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+start_etl = "etl_athena_to_es_dynamodb.main:main"

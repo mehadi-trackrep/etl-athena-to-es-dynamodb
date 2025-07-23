@@ -2,6 +2,7 @@
 import boto3
 from requests_aws4auth import AWS4Auth
 import logging
+import traceback
 from typing import List
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from opensearchpy.helpers import bulk
@@ -26,7 +27,7 @@ class OpenSearchDataSink(DataSink):
     def get_es_auth(self, boto_session):
         credentials = boto_session.get_credentials()
         auth = AWS4Auth(
-            region=self.region,
+            region=self.config.region,
             service='es',
             refreshable_credentials=credentials
         )
@@ -41,7 +42,7 @@ class OpenSearchDataSink(DataSink):
                 hosts=[
                     {
                         'host': self.config.endpoint,
-                        'port': self.config.port or 1234
+                        'port': self.config.port
                     }
                 ],
                 http_auth=self.get_es_auth(boto3.Session()),
@@ -61,12 +62,17 @@ class OpenSearchDataSink(DataSink):
         try:
             logger.info(f"Inserting batch of {len(records)} records into OpenSearch")
             
-            # Prepare documents for bulk insert
+            logger.info(f"OpenSearch index: {self.config.index_name}")
             actions = []
             for record in records:
+                item = record.to_dict()
                 action = {
+                     "_op_type": "update",
                     '_index': self.config.index_name,
-                    '_source': record.to_dict()
+                    "_id": item.get('orgno'),
+                    "_routing": item.get('orgno'),
+                    "doc": {k: v for k, v in item.items() if k != 'orgno'},
+                    # ,"doc_as_upsert": True  # Create if doesn't exist
                 }
                 actions.append(action)
             
@@ -75,7 +81,9 @@ class OpenSearchDataSink(DataSink):
                 self.client, 
                 actions, 
                 chunk_size=len(actions),
-                request_timeout=30
+                request_timeout=120,
+                raise_on_error=False,  # Don't fail entire batch on single doc errors
+                raise_on_exception=True
             )
             
             failed_count = len(failed_items) if failed_items else 0
@@ -92,7 +100,7 @@ class OpenSearchDataSink(DataSink):
             return result
             
         except Exception as e:
-            logger.error(f"Error inserting batch into OpenSearch: {str(e)}")
+            logger.error(f"Error inserting batch into OpenSearch. Traceback: {traceback.format_exc()}")
             return BatchResult(
                 total_records=len(records),
                 successful_records=0,

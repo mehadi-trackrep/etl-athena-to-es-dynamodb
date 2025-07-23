@@ -1,0 +1,17 @@
+"vehicles_meta": {
+    "type": "nested",
+    "properties": {
+        "count": {
+            "type": "long"
+        },
+        "vehicle_status": {
+            "type": "keyword"
+        },
+         "vehicle_type": {
+            "type": "keyword"
+        },
+         "leased": {
+            "type": "keyword"
+        }
+    }
+}

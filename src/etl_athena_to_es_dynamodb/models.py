@@ -1,5 +1,6 @@
 # models.py
 import ast
+import os
 import json
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any, List
@@ -28,7 +29,8 @@ class OpenSearchConfig(BaseModel):
     
     endpoint: str = Field(..., description="OpenSearch endpoint URL") # host
     index_name: str = Field(..., description="OpenSearch index name")
-    port: Optional[int] = Field(1234, ge=1, le=65535, description="OpenSearch port number")
+    region: Optional[str] = Field(None, description="AWS region for OpenSearch")
+    port: Optional[int] = Field(443, ge=1, le=65535, description="OpenSearch port number")
     # username: Optional[str] = Field(None, description="OpenSearch username")
     # password: Optional[str] = Field(None, description="OpenSearch password")
 

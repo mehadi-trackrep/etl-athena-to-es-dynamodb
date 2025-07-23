@@ -42,6 +42,7 @@ def load_configuration():
             opensearch_config = OpenSearchConfig(
                 endpoint=os.getenv('OPENSEARCH_ENDPOINT'),
                 index_name=os.getenv('OPENSEARCH_INDEX', 'data'),
+                region=os.getenv('AWS_REGION', 'us-east-1'),
                 # username=os.getenv('OPENSEARCH_USERNAME'),
                 # password=os.getenv('OPENSEARCH_PASSWORD')
             )
@@ -75,8 +76,8 @@ def main():
         pipeline = PipelineFactory.create_pipeline(
             aws_config=aws_config,
             athena_config=athena_config,
-            # opensearch_config=opensearch_config,
-            dynamodb_config=dynamodb_config,
+            opensearch_config=opensearch_config,
+            # dynamodb_config=dynamodb_config,
             batch_config=batch_config
         )
         

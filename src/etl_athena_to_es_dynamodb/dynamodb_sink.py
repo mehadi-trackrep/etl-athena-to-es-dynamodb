@@ -81,7 +81,7 @@ class DynamoDBDataSink(DataSink):
                         AttributeUpdates=attribute_updates
                     )
                     successful_count += 1
-                    if successful_count % 1000 == 0:
+                    if successful_count % 500 == 0:
                         logger.info(f"Successfully upserted {successful_count} records so far")
                 except (BotoCoreError, ClientError) as e:
                     failed_count += 1

@@ -64,6 +64,7 @@ class DataPipeline:
                 for sink in self.data_sinks:
                     logger.info(f"Submitting batch to sink: {sink.__class__.__name__}")
                     logger.info(f"Batch data size: {len(batch)}")
+                    logger.info(f"Batch 2 records: {batch[-2:]}")
                     future = executor.submit(sink.upsert_batch, batch)
                     future_to_sink[future] = sink.__class__.__name__
                 

@@ -41,19 +41,20 @@ def load_configuration():
         if os.getenv('OPENSEARCH_ENDPOINT'):
             opensearch_config = OpenSearchConfig(
                 endpoint=os.getenv('OPENSEARCH_ENDPOINT'),
-                index_name=os.getenv('OPENSEARCH_INDEX', 'data_index'),
-                username=os.getenv('OPENSEARCH_USERNAME'),
-                password=os.getenv('OPENSEARCH_PASSWORD')
+                index_name=os.getenv('OPENSEARCH_INDEX', 'data'),
+                # username=os.getenv('OPENSEARCH_USERNAME'),
+                # password=os.getenv('OPENSEARCH_PASSWORD')
             )
         
         dynamodb_config = None
         if os.getenv('DYNAMODB_TABLE_NAME'):
             dynamodb_config = DynamoDBConfig(
-                table_name=os.getenv('DYNAMODB_TABLE_NAME')
+                table_name=os.getenv('DYNAMODB_TABLE_NAME'),
+                overwrite_by_pkeys=os.getenv('DYNAMODB_OVERWRITE_BY_PKEYS', '').split(',') # convert to list
             )
         
         batch_config = BatchConfig(
-            batch_size=int(os.getenv('BATCH_SIZE', '25')),
+            batch_size=int(os.getenv('BATCH_SIZE', '1000')),
             max_workers=int(os.getenv('MAX_WORKERS', '4'))
         )
         
@@ -74,17 +75,50 @@ def main():
         pipeline = PipelineFactory.create_pipeline(
             aws_config=aws_config,
             athena_config=athena_config,
-            opensearch_config=opensearch_config,
+            # opensearch_config=opensearch_config,
             dynamodb_config=dynamodb_config,
             batch_config=batch_config
         )
         
         # Define query
         query = f"""
-        SELECT * 
-        FROM {athena_config.database}.{athena_config.table} 
-        LIMIT {os.getenv('QUERY_LIMIT', '1000')}
+            with 
+
+            pass_1 as (
+                SELECT 
+                    orgnr
+                    , max(d) as max_d
+                FROM "AwsDataCatalog"."vehicle_data"."swedish_vehicle_data"
+                group by 1
+            )
+
+            ,
+            pass_2 as (
+                SELECT a.orgnr as orgno, fordonsstatus as vehicle_status, fordonstyp as vehicle_type, leasing as leased, count(*) as "count"
+                FROM "AwsDataCatalog"."vehicle_data"."swedish_vehicle_data"a
+                    join pass_1 b on (a.d=b.max_d)
+                group by 1, 2, 3, 4
+            )
+
+
+
+            SELECT 
+            CAST(orgno as bigint) as orgno,
+            ARRAY_AGG(
+                cast (
+                    CAST(
+                    ROW(vehicle_status, vehicle_type, leased, "count") 
+                    AS ROW(vehicle_status varchar, vehicle_type VARCHAR, leased VARCHAR, "count" BIGINT)
+                    )
+                    as json
+                )
+            ) AS vehicles_meta
+            FROM pass_2
+            WHERE orgno IS NOT NULL
+            GROUP BY orgno
         """
+        if os.getenv('QUERY_LIMIT'):
+            query += f" LIMIT {os.getenv('QUERY_LIMIT', '1000')}"
         
         logger.info(f"Executing query: {query}")
         

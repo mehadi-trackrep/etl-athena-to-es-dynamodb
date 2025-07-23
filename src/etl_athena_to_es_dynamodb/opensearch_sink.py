@@ -1,4 +1,6 @@
 # opensearch_sink.py
+import boto3
+from requests_aws4auth import AWS4Auth
 import logging
 from typing import List
 from opensearchpy import OpenSearch, RequestsHttpConnection
@@ -21,17 +23,28 @@ class OpenSearchDataSink(DataSink):
         except ValidationError as e:
             raise ConfigurationError(f"Invalid OpenSearch configuration: {str(e)}")
     
+    def get_es_auth(self, boto_session):
+        credentials = boto_session.get_credentials()
+        auth = AWS4Auth(
+            region=self.region,
+            service='es',
+            refreshable_credentials=credentials
+        )
+
+        return auth
+
     @property
     def client(self) -> OpenSearch:
         """Lazy initialization of OpenSearch client"""
-        if self._client is None:
-            auth = None
-            if self.config.username and self.config.password:
-                auth = (self.config.username, self.config.password)
-            
+        if not self._client:
             self._client = OpenSearch(
-                hosts=[self.config.endpoint],
-                http_auth=auth,
+                hosts=[
+                    {
+                        'host': self.config.endpoint,
+                        'port': self.config.port or 1234
+                    }
+                ],
+                http_auth=self.get_es_auth(boto3.Session()),
                 use_ssl=True,
                 verify_certs=True,
                 connection_class=RequestsHttpConnection,
@@ -40,7 +53,7 @@ class OpenSearchDataSink(DataSink):
             logger.debug("OpenSearch client initialized")
         return self._client
     
-    def insert_batch(self, records: List[DataRecord]) -> BatchResult:
+    def upsert_batch(self, records: List[DataRecord]) -> BatchResult:
         """Insert batch of records into OpenSearch"""
         if not records:
             return BatchResult(total_records=0, successful_records=0, failed_records=0)

@@ -7,16 +7,18 @@ It uses `uv` package manager.
 
     2. uv venv
 
-    3. uv pip install -r requirements.txt
+    3. source .venv/bin/activate.fish
 
-    4. add this:- 
+    4. uv pip install -r requirements.txt
+
+    5. add this:- 
     [project.scripts]
     start_etl = "etl_athena_to_es_dynamodb.main:main"
 
-    5. uv pip install -e .
+    6. uv pip install -e .
     This makes etl_athena_to_es_dynamodb importable and registers the start_etl script.
 
-    6. uv run start_etl
+    7. uv run start_etl
 ```
 
 ### Quick Start

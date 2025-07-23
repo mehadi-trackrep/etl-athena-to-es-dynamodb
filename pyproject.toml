@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "ETL pipeline: Athena -> OpenSearch + DynamoDB"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "requests-aws4auth>=1.3.1",
+]
 
 [project.scripts]
 start_etl = "etl_athena_to_es_dynamodb.main:main"

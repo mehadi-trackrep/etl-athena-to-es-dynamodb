@@ -53,13 +53,13 @@ class AthenaDataSource(DataSource):
         """Fetch data from Athena table"""
         try:
             logger.info(f"Starting Athena query execution")
-            
+
             # Start query execution
             response = self.athena_client.start_query_execution(
                 QueryString=query,
-                QueryExecutionContext={'Database': self.athena_config.database},
+                # QueryExecutionContext={'Database': self.athena_config.database},
                 ResultConfiguration={'OutputLocation': self.athena_config.s3_output_location},
-                WorkGroup=self.athena_config.work_group
+                # WorkGroup=self.athena_config.work_group
             )
             
             query_execution_id = response['QueryExecutionId']

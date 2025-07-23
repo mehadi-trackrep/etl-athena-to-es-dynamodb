@@ -26,6 +26,7 @@ class DataPipeline:
         """Execute the data pipeline"""
         try:
             logger.info("Starting data pipeline execution")
+            logger.info(f"self.data_source: {self.data_source}")
             
             # Fetch data from source
             data_iterator = self.data_source.fetch_data(query)
@@ -61,7 +62,9 @@ class DataPipeline:
                 # Submit batch to all sinks concurrently
                 future_to_sink = {}
                 for sink in self.data_sinks:
-                    future = executor.submit(sink.insert_batch, batch)
+                    logger.info(f"Submitting batch to sink: {sink.__class__.__name__}")
+                    logger.info(f"Batch data size: {len(batch)}")
+                    future = executor.submit(sink.upsert_batch, batch)
                     future_to_sink[future] = sink.__class__.__name__
                 
                 # Collect results from all sinks

@@ -20,8 +20,8 @@ class DataSink(ABC):
     """Abstract interface for data sinks (ISP)"""
     
     @abstractmethod
-    def insert_batch(self, records: List[DataRecord]) -> BatchResult:
-        """Insert a batch of records"""
+    def upsert_batch(self, records: List[DataRecord]) -> BatchResult:
+        """Upsert a batch of records"""
         pass
     
     @abstractmethod

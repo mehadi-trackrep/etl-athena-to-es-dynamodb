@@ -76,8 +76,8 @@ def main():
         pipeline = PipelineFactory.create_pipeline(
             aws_config=aws_config,
             athena_config=athena_config,
-            opensearch_config=opensearch_config,
-            # dynamodb_config=dynamodb_config,
+            # opensearch_config=opensearch_config,
+            dynamodb_config=dynamodb_config,
             batch_config=batch_config
         )
         
@@ -89,22 +89,22 @@ def main():
                 SELECT 
                     orgnr
                     , max(d) as max_d
-                FROM "AwsDataCatalog"."vehicle_data"."swedish_vehicle_data"
+                FROM "vehicle_data"."swedish_vehicle_data" 
                 group by 1
             )
 
             ,
             pass_2 as (
                 SELECT a.orgnr as orgno, fordonsstatus as vehicle_status, fordonstyp as vehicle_type, leasing as leased, count(*) as "count"
-                FROM "AwsDataCatalog"."vehicle_data"."swedish_vehicle_data"a
-                    join pass_1 b on (a.d=b.max_d)
+                FROM "vehicle_data"."swedish_vehicle_data" a
+                    join pass_1 b on (a.orgnr=b.orgnr and a.d=b.max_d)
                 group by 1, 2, 3, 4
             )
 
 
 
             SELECT 
-            CAST(orgno as bigint) as orgno,
+            orgno,
             ARRAY_AGG(
                 cast (
                     CAST(
@@ -118,7 +118,7 @@ def main():
             WHERE orgno IS NOT NULL
             GROUP BY orgno
         """
-        if os.getenv('QUERY_LIMIT'):
+        if os.getenv('QUERY_LIMIT', None):
             query += f" LIMIT {os.getenv('QUERY_LIMIT', '1000')}"
         
         logger.info(f"Executing query: {query}")

@@ -2,6 +2,7 @@
 import os
 import logging
 from dotenv import load_dotenv
+from etl_athena_to_es_dynamodb.utils import get_athena_source_query
 from etl_athena_to_es_dynamodb.models import (AWSConfig, AthenaConfig, OpenSearchConfig, 
                    DynamoDBConfig, BatchConfig)
 from etl_athena_to_es_dynamodb.pipeline_factory import PipelineFactory
@@ -82,94 +83,7 @@ def main():
         )
         
         # Define query
-        query = f"""
-            with 
-
-            pass_1 as (
-                SELECT 
-                    orgnr
-                    , max(d) as max_d
-                FROM "vehicle_data"."swedish_vehicle_data" 
-                group by 1
-            )
-
-            ,
-            pass_2 as (
-                SELECT 
-                    a.orgnr as orgno
-                    , fordonsstatus as vehicle_status
-                    , fordonstyp as vehicle_type
-                    , leasing as leased
-                    , *
-                FROM "vehicle_data"."swedish_vehicle_data" a
-                    join pass_1 b on (a.orgnr=b.orgnr and a.d=b.max_d)
-            )
-
-            ,
-            pass_3 as (
-                SELECT 
-                    orgno
-                    ,vehicle_status
-                    ,vehicle_type
-                    ,leased
-                    , count(*) over(partition by orgno, vehicle_status, vehicle_type, leased) as count_vehicle_status__vehicle_type__leased
-                    , count(*) over(partition by orgno, vehicle_status) as count_vehicle_status
-                    , count(*) over(partition by orgno, vehicle_type) as count_vehicle_type
-                    , count(*) over(partition by orgno, leased) as count_leased
-                    , count(*) over(partition by orgno, vehicle_status, vehicle_type) as count_vehicle_status__vehicle_type
-                    , count(*) over(partition by orgno, vehicle_status, leased) as count_vehicle_status__leased
-                    , count(*) over(partition by orgno, vehicle_type, leased) as count_vehicle_type__leased
-                    , row_number() over(partition by orgno, vehicle_status, vehicle_type, leased) as rn
-                FROM pass_2
-            )
-
-
-            , pass_4 as (
-                select 
-                    *
-                    , concat(lower(vehicle_status), '__', lower(vehicle_type),'__', lower(leased)) as groupby_vehicle_status__vehicle_type__leased
-                    , lower(vehicle_status) as groupby_vehicle_status
-                    , lower(vehicle_type) as groupby_vehicle_type
-                    , lower(leased) as groupby_leased
-                    , concat(lower(vehicle_status), '__', lower(vehicle_type)) as groupby_vehicle_status__vehicle_type
-                    , concat(lower(vehicle_status),'__', lower(leased)) as groupby_vehicle_status__leased
-                    , concat(lower(vehicle_type),'__', lower(leased)) as groupby_vehicle_type__leased
-                from pass_3
-                where rn=1
-            )
-
-
-            , pass_5 as (
-                select distinct orgno, vehicle_status, vehicle_type, leased, groupby_vehicle_status__vehicle_type__leased as grouped_by, count_vehicle_status__vehicle_type__leased as "count" from pass_4
-                union all 
-                select distinct orgno, vehicle_status, null as vehicle_type, null as leased, groupby_vehicle_status as grouped_by, count_vehicle_status as "count" from pass_4
-                union all
-                select distinct orgno, null as vehicle_status, vehicle_type, null as leased, groupby_vehicle_type as grouped_by, count_vehicle_type as "count" from pass_4
-                union all
-                select distinct orgno, null as vehicle_status, null as vehicle_type, leased, groupby_leased as grouped_by, count_leased as "count" from pass_4
-                union all
-                select distinct orgno, vehicle_status, null as vehicle_type, leased, groupby_vehicle_status__leased as grouped_by, count_vehicle_status__leased as "count" from pass_4
-                union all
-                select distinct orgno, null as vehicle_status, vehicle_type, leased, groupby_vehicle_type__leased as grouped_by, count_vehicle_type__leased as "count" from pass_4
-                union all
-                select distinct orgno, vehicle_status, vehicle_type, null as leased, groupby_vehicle_status__vehicle_type as grouped_by, count_vehicle_status__vehicle_type as "count" from pass_4
-            )
-
-            SELECT 
-            orgno,
-            ARRAY_AGG(
-                cast (
-                    CAST(
-                    ROW(vehicle_status, vehicle_type, leased, grouped_by, "count") 
-                    AS ROW(vehicle_status varchar, vehicle_type VARCHAR, leased VARCHAR, grouped_by VARCHAR, "count" BIGINT)
-                    )
-                    as json
-                )
-            ) AS vehicles_meta
-            FROM pass_5
-            WHERE orgno IS NOT NULL
-            GROUP BY orgno
-        """
+        query = get_athena_source_query()
         if os.getenv('QUERY_LIMIT', None):
             query += f" LIMIT {os.getenv('QUERY_LIMIT', '1000')}"
         
@@ -180,7 +94,7 @@ def main():
         
         # Log results
         logger.info("=== Pipeline Execution Results ===")
-        logger.info(f"Total batches processed: {results['total_batches']}")
+        logger.info(f"Total processed # batches: {results['total_processed_batches']}")
         
         for sink_name, sink_results in results['sinks'].items():
             logger.info(f"\n{sink_name} Results:")

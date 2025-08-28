@@ -51,13 +51,14 @@ class DataPipeline:
     
     def _process_batches_concurrently(self, batches) -> Dict[str, Any]:
         """Process batches concurrently across all sinks"""
-        total_batches = 0
+        total_processed_batches = 0
+ 
         sink_results = {sink.__class__.__name__: [] for sink in self.data_sinks}
         
         with ThreadPoolExecutor(max_workers=self.batch_config.max_workers) as executor:
             for batch in batches:
-                total_batches += 1
-                logger.info(f"Processing batch {total_batches} with {len(batch)} records")
+                total_processed_batches += 1
+                logger.info(f"==> Processing batch {total_processed_batches} with {len(batch)} records")
                 
                 # Submit batch to all sinks concurrently
                 future_to_sink = {}
@@ -87,14 +88,14 @@ class DataPipeline:
                         sink_results[sink_name].append(failed_result)
         
         # Aggregate results
-        aggregated_results = self._aggregate_results(sink_results, total_batches)
+        aggregated_results = self._aggregate_results(sink_results, total_processed_batches)
         return aggregated_results
     
     def _aggregate_results(self, sink_results: Dict[str, List[BatchResult]], 
-                          total_batches: int) -> Dict[str, Any]:
+                          total_processed_batches: int) -> Dict[str, Any]:
         """Aggregate results from all sinks"""
         aggregated = {
-            'total_batches': total_batches,
+            'total_processed_batches': total_processed_batches,
             'sinks': {}
         }
         

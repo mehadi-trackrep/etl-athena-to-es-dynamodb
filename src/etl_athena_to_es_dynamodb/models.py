@@ -23,6 +23,13 @@ class AthenaConfig(BaseModel):
     s3_output_location: str = Field(..., description="S3 location for query results")
     work_group: str = Field(default="primary", description="Athena work group")
 
+class DocumentConfig(BaseModel):
+    """Document configuration model: parent or child"""
+    model_config = ConfigDict(frozen=True)
+    
+    document_type: str = Field(..., description="OpenSearch docuemnt type: parent or child")
+    child_relation_type: str = Field(..., description="Child relation type if document_type is child")
+
 class OpenSearchConfig(BaseModel):
     """OpenSearch configuration model"""
     model_config = ConfigDict(frozen=True)

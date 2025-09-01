@@ -2,7 +2,7 @@
 import logging
 from typing import List, Optional
 from etl_athena_to_es_dynamodb.models import (AWSConfig, AthenaConfig, OpenSearchConfig, 
-                   DynamoDBConfig, BatchConfig)
+                   DocumentConfig, DynamoDBConfig, BatchConfig)
 from etl_athena_to_es_dynamodb.athena_source import AthenaDataSource
 from etl_athena_to_es_dynamodb.opensearch_sink import OpenSearchDataSink
 from etl_athena_to_es_dynamodb.dynamodb_sink import DynamoDBDataSink
@@ -19,6 +19,7 @@ class PipelineFactory:
     def create_pipeline(
         aws_config: AWSConfig,
         athena_config: AthenaConfig,
+        document_config: DocumentConfig,
         opensearch_config: Optional[OpenSearchConfig] = None,
         dynamodb_config: Optional[DynamoDBConfig] = None,
         batch_config: Optional[BatchConfig] = None
@@ -37,10 +38,10 @@ class PipelineFactory:
         # Create data sinks
         data_sinks = []
         if opensearch_config:
-            data_sinks.append(OpenSearchDataSink(opensearch_config))
+            data_sinks.append(OpenSearchDataSink(opensearch_config, document_config))
             logger.info("OpenSearch sink added to pipeline")
         if dynamodb_config:
-            data_sinks.append(DynamoDBDataSink(aws_config, dynamodb_config))
+            data_sinks.append(DynamoDBDataSink(aws_config, dynamodb_config, document_config))
             logger.info("DynamoDB sink added to pipeline")
         
         # Create batch processor

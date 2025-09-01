@@ -4,7 +4,7 @@ import logging
 from dotenv import load_dotenv
 from etl_athena_to_es_dynamodb.utils import get_athena_source_query
 from etl_athena_to_es_dynamodb.models import (AWSConfig, AthenaConfig, OpenSearchConfig, 
-                   DynamoDBConfig, BatchConfig)
+                   DocumentConfig, DynamoDBConfig, BatchConfig)
 from etl_athena_to_es_dynamodb.pipeline_factory import PipelineFactory
 from etl_athena_to_es_dynamodb.exceptions import DataPipelineError, ConfigurationError
 
@@ -38,6 +38,13 @@ def load_configuration():
             work_group=os.getenv('ATHENA_WORK_GROUP', 'primary')
         )
         
+        document_config = None # relation type - parent/child
+        if os.getenv('OPENSEARCH_DOCUMENT_TYPE', 'parent'):
+            document_config = DocumentConfig(
+                document_type=os.getenv('OPENSEARCH_DOCUMENT_TYPE', 'parent'),
+                child_relation_type=os.getenv('OPENSEARCH_CHILD_RELATION_TYPE')
+            )
+        
         opensearch_config = None
         if os.getenv('OPENSEARCH_ENDPOINT'):
             opensearch_config = OpenSearchConfig(
@@ -60,7 +67,7 @@ def load_configuration():
             max_workers=int(os.getenv('MAX_WORKERS', '4'))
         )
         
-        return aws_config, athena_config, opensearch_config, dynamodb_config, batch_config
+        return aws_config, athena_config, document_config, opensearch_config, dynamodb_config, batch_config
         
     except Exception as e:
         raise ConfigurationError(f"Failed to load configuration: {str(e)}")
@@ -71,12 +78,13 @@ def main():
         logger.info("Starting AWS Data Pipeline")
         
         # Load configuration
-        aws_config, athena_config, opensearch_config, dynamodb_config, batch_config = load_configuration()
+        aws_config, athena_config, document_config, opensearch_config, dynamodb_config, batch_config = load_configuration()
         
         # Create pipeline
         pipeline = PipelineFactory.create_pipeline(
             aws_config=aws_config,
             athena_config=athena_config,
+            document_config=document_config,
             opensearch_config=opensearch_config,
             # dynamodb_config=dynamodb_config,
             batch_config=batch_config

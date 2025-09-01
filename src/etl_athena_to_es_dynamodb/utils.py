@@ -1,72 +1,112 @@
+from datetime import datetime
+
+def get_utc_time():
+    return datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
 
 def get_athena_source_query() -> str:
 
     query = f"""
-with 
-
-se_ie_companies_dont_have_crm_or_lists as (
-SELECT orgno,
-    company_name,
-    count(*) over(partition by company_name) as total_count
-FROM "prod_proff_data"."es_required_company_field_dump_json"
-where d='2025-08-24'
-    and country_code='SE'
-    and strpos(organisation_group_labels, 'OTINDIVIDUALENTREPRENEURSHIP') > 0
-    and (company_lists is null or trim(company_lists) = '')
-    and (company_in_crm is null or trim(company_in_crm) = '')
-    -- and (marked_as_client_by_account is null or trim(marked_as_client_by_account) = '')
-),
-
-se_ie_companies_dont_have_crm_or_lists_v2 as (
-SELECT orgno,
-    company_name,
-    count(*) over(partition by company_name) as total_count
-FROM "prod_proff_data"."es_required_company_field_dump_json"
-where d='2025-08-24'
-    and country_code='SE'
-    and strpos(organisation_group_labels, 'OTINDIVIDUALENTREPRENEURSHIP') > 0
-    and (company_lists is null or trim(company_lists) = '')
-    and (company_in_crm is null or trim(company_in_crm) = '')
-    and (marked_as_client_by_account is null or trim(marked_as_client_by_account) = '')
+with raw_data as (
+    SELECT
+      -- Identifiers
+      Orgnr AS orgno,
+      
+      -- Vehicle Status and Type
+      Fordonsstatus AS vehicle_status,
+      Fordonstyp AS vehicle_type,
+      Marke AS brand,
+      Fordonsar AS vehicle_year,
+      Modellar AS model_year,
+      
+      -- Key Dates
+      Senast_agarbyte AS last_ownership_change,
+      Forregistrerad AS pre_registered_date,
+      Forst_i_trafik AS first_in_traffic_date,
+      Forst_pa_svenska_vagar AS first_on_roads_date,
+      Nasta_besiktning_senast AS next_inspection_due_date,
+      
+      -- Boolean Flags
+      CASE WHEN lower(Registrerad_for_yrkestrafik) IN ('ja', 'true', '1') THEN true ELSE false END AS registered_for_commercial_traffic,
+      CASE WHEN lower(Importerad) IN ('ja', 'true', '1') THEN true ELSE false END AS imported,
+      CASE WHEN lower(Leasing) IN ('ja', 'true', '1') THEN true ELSE false END AS leasing,
+      CASE WHEN lower(Kopt_pa_kredit) IN ('ja', 'true', '1') THEN true ELSE false END AS purchased_on_credit,
+      
+      -- Odometer
+      Matarstallning AS odometer_reading,
+      Matarstallning_enhet AS odometer_unit,
+      
+      -- Fuel Types
+      Drivmedel_1 AS fuel_type_1,
+      Drivmedel_2 AS fuel_type_2,
+      Drivmedel_3 AS fuel_type_3,
+      row_number() over(partition by Orgnr order by d desc) as rn
+    
+    FROM
+      AwsDataCatalog.vehicle_data.vehicle_data
+    
+    WHERE
+      cc = 'se' AND d = '2025-08-27'
 )
 
-, new_se_ie_companies as (
-select organisationnumber as orgno
-    , sorganisationnumber
-from "prod_proff_data"."proff_raw_data_iceberg"
-where country_code='se'
-    and companytype in ('Enskild näringsidkare')
-    and try_cast(sorganisationnumber as bigint) is not null
-    and organisationnumber = try_cast(sorganisationnumber as bigint)
-)
 
-, we_have_run as (
-select a.orgno
-    , a.company_name
-    , a.total_count
-from se_ie_companies_dont_have_crm_or_lists a
-    left join new_se_ie_companies b on (
-        a.orgno = b.orgno
-    )
-where total_count = 2 and b.orgno is null
-)
+select 
+    orgno
+    , ARRAY_AGG(
+        cast (
+            CAST(
+              ROW(
+                cast(orgno as bigint),
+				vehicle_status,
+				vehicle_type,
+				brand,
+				try_cast(vehicle_year as bigint),
+				try_cast(model_year as bigint),
+				last_ownership_change,
+				try_cast(pre_registered_date as date),
+				try_cast(first_in_traffic_date as date),
+				try_cast(first_on_roads_date as date),
+				try_cast(next_inspection_due_date as date),
+				registered_for_commercial_traffic,
+				try_cast(imported as boolean),
+				try_cast(leasing as boolean),
+				try_cast(purchased_on_credit as boolean),
+				try_cast(odometer_reading as bigint),
+				odometer_unit,
+				fuel_type_1,
+				fuel_type_2,
+				fuel_type_3
+			) 
+              AS 
+              ROW(
+                orgno bigint,
+				vehicle_status varchar,
+				vehicle_type varchar,
+				brand varchar,
+				vehicle_year bigint,
+				model_year bigint,
+				last_ownership_change varchar,
+				pre_registered_date date,
+				first_in_traffic_date date,
+				first_on_roads_date date,
+				next_inspection_due_date date,
+				registered_for_commercial_traffic varchar,
+				imported boolean,
+				leasing boolean,
+				purchased_on_credit boolean,
+				odometer_reading bigint,
+				odometer_unit varchar,
+				fuel_type_1 varchar,
+				fuel_type_2 varchar,
+				fuel_type_3 varchar
 
-, we_should_run as (
-select a.orgno
-    , a.company_name
-    , a.total_count
-from se_ie_companies_dont_have_crm_or_lists_v2 a
-    left join new_se_ie_companies b on (
-        a.orgno = b.orgno
-    )
-where total_count = 2 and b.orgno is null
-)
-
-select a.orgno
-, 'ACTIVE' as status
-from we_have_run a 
-left join we_should_run b on (a.orgno=b.orgno)
-where b.orgno is null
+              )
+            )
+            as json
+        )
+      ) as child_data
+from raw_data
+where rn=1
+group by orgno
     """
     
     return query

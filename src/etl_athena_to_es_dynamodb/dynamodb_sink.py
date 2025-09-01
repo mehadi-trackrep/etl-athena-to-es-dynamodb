@@ -6,7 +6,7 @@ from typing import List
 from botocore.exceptions import BotoCoreError, ClientError
 from pydantic import ValidationError
 from etl_athena_to_es_dynamodb.interfaces import DataSink
-from etl_athena_to_es_dynamodb.models import DataRecord, BatchResult, AWSConfig, DynamoDBConfig
+from etl_athena_to_es_dynamodb.models import DataRecord, BatchResult, AWSConfig, DynamoDBConfig, DocumentConfig
 from etl_athena_to_es_dynamodb.exceptions import DataSinkError, ConfigurationError
 
 logger = logging.getLogger(__name__)
@@ -14,10 +14,11 @@ logger = logging.getLogger(__name__)
 class DynamoDBDataSink(DataSink):
     """DynamoDB data sink implementation (SRP)"""
     
-    def __init__(self, aws_config: AWSConfig, dynamodb_config: DynamoDBConfig):
+    def __init__(self, aws_config: AWSConfig, dynamodb_config: DynamoDBConfig, document_config: DocumentConfig):
         try:
             self.aws_config = aws_config
             self.dynamodb_config = dynamodb_config
+            self.document_config = document_config
             self._resource = None
             self._table = None
             logger.info("DynamoDBDataSink initialized successfully")

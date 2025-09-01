@@ -1,24 +1,27 @@
 # opensearch_sink.py
+import uuid
 import boto3
-from requests_aws4auth import AWS4Auth
 import logging
 import traceback
 from typing import List
-from opensearchpy import OpenSearch, RequestsHttpConnection
-from opensearchpy.helpers import bulk
 from pydantic import ValidationError
+from opensearchpy.helpers import bulk
+from requests_aws4auth import AWS4Auth
+import etl_athena_to_es_dynamodb.utils as utils
+from opensearchpy import OpenSearch, RequestsHttpConnection
 from etl_athena_to_es_dynamodb.interfaces import DataSink
-from etl_athena_to_es_dynamodb.models import DataRecord, BatchResult, OpenSearchConfig
 from etl_athena_to_es_dynamodb.exceptions import DataSinkError, ConfigurationError
+from etl_athena_to_es_dynamodb.models import DataRecord, BatchResult, OpenSearchConfig, DocumentConfig
 
 logger = logging.getLogger(__name__)
 
 class OpenSearchDataSink(DataSink):
     """OpenSearch data sink implementation (SRP)"""
     
-    def __init__(self, config: OpenSearchConfig):
+    def __init__(self, config: OpenSearchConfig, document_config: DocumentConfig):
         try:
             self.config = config
+            self.document_config = document_config
             self._client = None
             logger.info("OpenSearchDataSink initialized successfully")
         except ValidationError as e:
@@ -58,6 +61,11 @@ class OpenSearchDataSink(DataSink):
         """Insert batch of records into OpenSearch"""
         if not records:
             return BatchResult(total_records=0, successful_records=0, failed_records=0)
+
+        document_type = self.document_config.document_type # parent or child
+        child_relation_type = self.document_config.child_relation_type
+        if not child_relation_type:
+            raise DataSinkError("Child relation type must be specified for child documents")
         
         try:
             logger.info(f"Inserting batch of {len(records)} records into OpenSearch")
@@ -66,15 +74,41 @@ class OpenSearchDataSink(DataSink):
             actions = []
             for record in records:
                 item = record.to_dict()
-                action = {
-                     "_op_type": "update",
-                    '_index': self.config.index_name,
-                    "_id": item.get('orgno'),
-                    "_routing": item.get('orgno'),
-                    "doc": {k: v for k, v in item.items() if k != 'orgno'},
-                    # ,"doc_as_upsert": True  # Create if doesn't exist
-                }
-                actions.append(action)
+                logger.info(f"Record to insert: {item}")
+                
+                if document_type.lower().strip() == "parent":
+                    doc_ = {
+                        "indexed_at": utils.get_utc_time()
+                    }
+                    action = {
+                        "_op_type": "update",
+                        '_index': self.config.index_name,
+                        "_id": item['orgno'],
+                        "_routing": item['orgno'],
+                        "doc": doc_ | {k: v for k, v in item.items() if k != 'orgno' or v}
+                    }
+                    actions.append(action)
+                
+                if document_type.lower().strip() == "child":
+                    doc_rel = {
+                        "relation_type": {
+                            "name": child_relation_type,
+                            "parent": item['orgno']
+                        },
+                        "indexed_at": utils.get_utc_time()
+                    }
+                    child_data_list = item['child_data']
+                    for child_doc in child_data_list:
+                        action = {
+                            "_op_type": "update",
+                            '_index': self.config.index_name,
+                            "_id": uuid.uuid4(), # guid
+                            "_routing": item['orgno'],
+                            "doc": doc_rel | {k: v for k, v in child_doc.items() if v}, # Merge dictionaries
+                            "doc_as_upsert": True  # Create if doesn't exist
+                        }
+                        logger.info(f"\n---> Child document to insert: {action}\n")
+                        actions.append(action)
             
             # Perform bulk insert
             success_count, failed_items = bulk(

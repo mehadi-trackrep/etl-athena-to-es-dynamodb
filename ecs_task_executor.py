@@ -84,7 +84,7 @@ def run_ecs_task_backpop():
             },
             {
                 "name": "AWS_ACCOUNT_ID",
-                "value": "143728503219"
+                "value": os.getenv('AWS_ACCOUNT_ID')
             },
             {
                 "name": "ATHENA_DATABASE",
@@ -124,7 +124,7 @@ def run_ecs_task_backpop():
             },
             {
                 "name": "OPENSEARCH_ENDPOINT",
-                "value": "search-goava-data-jtecgtbzuyvs4gcrvtxiqv7fzy.eu-west-1.es.amazonaws.com"
+                "value": os.getenv('OPENSEARCH_ENDPOINT')
             }
         ]
     )

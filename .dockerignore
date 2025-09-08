@@ -26,3 +26,6 @@ build
 *.swo
 *.bak
 *.tmp
+data
+schemas
+pipeline.log

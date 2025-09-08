@@ -52,7 +52,7 @@ class BatchConfig(BaseModel):
     """Batch processing configuration model"""
     model_config = ConfigDict(frozen=True)
     
-    batch_size: int = Field(default=100, ge=1, le=1000, description="Batch size for processing")
+    batch_size: int = Field(default=1000, ge=1, le=10000, description="Batch size for processing")
     max_workers: int = Field(default=4, ge=1, le=10, description="Maximum worker threads")
 
 class DataRecord(BaseModel):

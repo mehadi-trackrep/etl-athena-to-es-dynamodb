@@ -1,44 +1,50 @@
-# Use Python 3.11 slim image as base
-FROM python:3.13-slim
+# Use Python 3.11 slim image for ARM64
+FROM --platform=linux/arm64 python:3.13-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    UV_SYSTEM_PYTHON=1 \
+    UV_NO_CACHE=1
 
 # Set work directory
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    git \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        gcc \
+        g++ \
+        libc6-dev \
+        curl \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
-COPY requirements.txt .
+# Install uv - download the binary directly for more reliability
+RUN curl -LsSf https://github.com/astral-sh/uv/releases/latest/download/uv-aarch64-unknown-linux-gnu.tar.gz | tar -xz -C /usr/local/bin --strip-components=1
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Verify uv installation
+RUN uv --version
 
-# Copy application code
-COPY . .
+# Copy project files
+COPY pyproject.toml uv.lock* ./
+COPY src/ ./src/
+
+
+# Install dependencies and project using uv (no virtual environment in container)
+ENV UV_SYSTEM_PYTHON=1
+RUN uv sync --frozen --no-dev --no-install-workspace \
+    && uv pip install -e . --system
 
 # Create a non-root user
-RUN adduser --disabled-password --gecos '' --uid 1000 appuser && \
-    chown -R appuser:appuser /app
-
-# Switch to non-root user
+RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser \
+    && chown -R appuser:appuser /app
 USER appuser
 
-# Expose port (adjust as needed)
-EXPOSE 8000
+# Health check using uv run
+HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
+    CMD uv run python -c "import sys; print('Health check passed'); sys.exit(0)" || exit 1
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Default command (adjust based on your application)
-CMD ["python", "app.py"]
+# Set the entrypoint to use uv run
+ENTRYPOINT ["uv", "run"]
+CMD ["start_etl"]

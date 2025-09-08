@@ -38,11 +38,10 @@ with raw_data as (
       -- Fuel Types
       Drivmedel_1 AS fuel_type_1,
       Drivmedel_2 AS fuel_type_2,
-      Drivmedel_3 AS fuel_type_3,
-      row_number() over(partition by Orgnr order by d desc) as rn
+      Drivmedel_3 AS fuel_type_3
     
     FROM
-      AwsDataCatalog.vehicle_data.vehicle_data
+      "AwsDataCatalog"."vehicle_data"."vehicle_data"
     
     WHERE
       cc = 'se' AND d = '2025-08-27'
@@ -105,7 +104,6 @@ select
         )
       ) as child_data
 from raw_data
-where rn=1
 group by orgno
     """
     

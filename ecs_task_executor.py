@@ -83,12 +83,48 @@ def run_ecs_task_backpop():
                 "value": "1"
             },
             {
-                'name': 'RDS_ENV',
-                'value': 'prod'
+                "name": "AWS_ACCOUNT_ID",
+                "value": "143728503219"
             },
             {
-                'name': 'ENV',
-                'value': 'prod'
+                "name": "ATHENA_DATABASE",
+                "value": "TEST"
+            },
+            {
+                "name": "ATHENA_TABLE",
+                "value": "TEST"
+            },
+            {
+                "name": "ATHENA_S3_OUTPUT_LOCATION",
+                "value": "s3://goava-dev/athena-queries/output"
+            },
+            {
+                "name": "ATHENA_WORK_GROUP",
+                "value": "primary"
+            },
+            {
+                "name": "OPENSEARCH_DOCUMENT_TYPE",
+                "value": "child"
+            },
+            {
+                "name": "OPENSEARCH_CHILD_RELATION_TYPE",
+                "value": "vehicle"
+            },
+            {
+                "name": "DYNAMODB_TABLE_NAME",
+                "value": "company_v0.03"
+            },
+            {
+                "name": "DYNAMODB_OVERWRITE_BY_PKEYS",
+                "value": "orgno"
+            },
+            {
+                "name": "OPENSEARCH_INDEX",
+                "value": "data"
+            },
+            {
+                "name": "OPENSEARCH_ENDPOINT",
+                "value": "search-goava-data-jtecgtbzuyvs4gcrvtxiqv7fzy.eu-west-1.es.amazonaws.com"
             }
         ]
     )
